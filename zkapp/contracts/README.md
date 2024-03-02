@@ -1,4 +1,4 @@
-# Mina zkApp: PROJECT_NAME
+# Mina zkApp: Zkapp
 
 This template uses TypeScript.
 

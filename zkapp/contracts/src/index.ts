@@ -1,3 +1,3 @@
-import { Add } from './Add.js';
+import { Resolver } from './Resolver.js';
 
-export { Add };
+export { Resolver };
