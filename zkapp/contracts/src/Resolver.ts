@@ -72,6 +72,8 @@ import {
             NameData
           ).assertTrue();
 
+        this.sender.assertEquals(oldNamedata.mina_address);
+        
         let namedata = new NameData({ eth_address: ethAddr, mina_address: this.sender });
   
         let newtreeRoot = ProvableSMTUtils.computeRoot(

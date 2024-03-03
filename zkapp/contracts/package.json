@@ -37,5 +37,10 @@
   },
   "peerDependencies": {
     "o1js": "0.16.*"
+  },
+  "dependencies": {
+    "mongoose": "^8.2.0",
+    "o1js": "^0.16.2",
+    "o1js-merkle": "^0.1.0"
   }
 }
