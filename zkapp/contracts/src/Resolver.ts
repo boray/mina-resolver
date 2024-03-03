@@ -18,11 +18,11 @@ import {
 
   
   export class Resolver extends SmartContract {
-    @state(Field) treeRoot = State<Field>();
+    @state(Field) commitment = State<Field>();
   
     init() {
       super.init();
-      this.treeRoot.set(Field(0));
+      this.commitment.set(Field(0));
     }
   
     @method register(
@@ -30,19 +30,19 @@ import {
       ethAddr: Field,
       merkleProof: SparseMerkleProof
     ) {
-      let treeRoot = this.treeRoot.get();
-      this.treeRoot.requireEquals(treeRoot);
+      let commitment = this.commitment.get();
+      this.commitment.requireEquals(commitment);
   
       ProvableSMTUtils.checkNonMembership(
         merkleProof,
-        treeRoot,
+        commitment,
         name,
         CircuitString
       ).assertTrue();
   
       let namedata = new NameData({ eth_address: ethAddr, mina_address: this.sender });
 
-      let newtreeRoot = ProvableSMTUtils.computeRoot(
+      let newCommitment = ProvableSMTUtils.computeRoot(
         merkleProof.sideNodes,
         name,
         CircuitString,
@@ -50,7 +50,7 @@ import {
         NameData
       );
   
-      this.treeRoot.set(newtreeRoot);
+      this.commitment.set(newCommitment);
     }
   
     @method set_eth_addr(
@@ -59,13 +59,13 @@ import {
         ethAddr: Field,
         merkleProof: SparseMerkleProof
       ) {
-        let treeRoot = this.treeRoot.get();
-        this.treeRoot.requireEquals(treeRoot);
+        let commitment = this.commitment.get();
+        this.commitment.requireEquals(commitment);
         let oldNamedata = new NameData({ eth_address: oldEthAddr, mina_address: this.sender });
 
         ProvableSMTUtils.checkMembership(
             merkleProof,
-            treeRoot,
+            commitment,
             name,
             CircuitString,
             oldNamedata,
@@ -76,7 +76,7 @@ import {
         
         let namedata = new NameData({ eth_address: ethAddr, mina_address: this.sender });
   
-        let newtreeRoot = ProvableSMTUtils.computeRoot(
+        let newCommitment = ProvableSMTUtils.computeRoot(
           merkleProof.sideNodes,
           name,
           CircuitString,
@@ -84,7 +84,7 @@ import {
           NameData
         );
     
-        this.treeRoot.set(newtreeRoot);
+        this.commitment.set(newCommitment);
       }
 
   }

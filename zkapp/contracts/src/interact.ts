@@ -13,8 +13,13 @@
  * Run with node:     `$ node build/src/interact.js <deployAlias>`.
  */
 import fs from 'fs/promises';
-import { Mina, NetworkId, PrivateKey } from 'o1js';
-import { Add } from './Add.js';
+import { AccountUpdate, CircuitString, Field, Mina, NetworkId, PrivateKey, Struct, PublicKey} from 'o1js';
+import { Resolver } from './Resolver.js';
+import {
+  MemoryStore,
+  SparseMerkleTree
+} from 'o1js-merkle';
+class NameData extends Struct({ eth_address: Field, mina_address: PublicKey }){}
 
 // check command line arg
 let deployAlias = process.argv[2];
@@ -66,33 +71,53 @@ const fee = Number(config.fee) * 1e9; // in nanomina (1 billion = 1.0 mina)
 Mina.setActiveInstance(Network);
 let feepayerAddress = feepayerKey.toPublicKey();
 let zkAppAddress = zkAppKey.toPublicKey();
-let zkApp = new Add(zkAppAddress);
+let zkApp = new Resolver(zkAppAddress);
 
-let sentTx;
+
+let sentTx: Mina.TransactionId;
+
+
+let initialCommitment: Field = Field(0);
+
+let mathborayeth: CircuitString = CircuitString.fromString("math.boray.eth");
+
+let store = new MemoryStore<NameData>();
+let smt = await SparseMerkleTree.build<CircuitString, NameData>(
+  store,
+  CircuitString,
+  NameData as any
+);
+let mathborayethObj = new NameData({
+  eth_address: Field(0),
+  mina_address: PublicKey.fromPrivateKey(PrivateKey.random())
+});
+
+await smt.update(mathborayeth, mathborayethObj);
+
+
+// now that we got our accounts set up, we need the commitment to deploy our contract!
+initialCommitment = smt.getRoot();
+let merkleProof = await smt.prove(mathborayeth);
+
+
 // compile the contract to create prover keys
 console.log('compile the contract...');
-await Add.compile();
-try {
-  // call update() and send transaction
-  console.log('build transaction and create proof...');
-  let tx = await Mina.transaction({ sender: feepayerAddress, fee }, () => {
-    zkApp.update();
-  });
-  await tx.prove();
-  console.log('send transaction...');
-  sentTx = await tx.sign([feepayerKey]).send();
-} catch (err) {
-  console.log(err);
-}
-if (sentTx?.hash() !== undefined) {
-  console.log(`
-Success! Update transaction sent.
+await Resolver.compile();
 
-Your smart contract state will be updated
-as soon as the transaction is included in a block:
-${getTxnUrl(config.url, sentTx.hash())}
-`);
-}
+let tx = await Mina.transaction(feepayerAddress, () => {
+  AccountUpdate.fundNewAccount(feepayerAddress);
+  zkApp.init();
+});
+await tx.prove();
+await tx.sign([feepayerKey]).send();
+
+// --------
+
+await registerName(mathborayeth, mathborayethObj);
+
+
+
+// --------
 
 function getTxnUrl(graphQlUrl: string, txnHash: string | undefined) {
   const txnBroadcastServiceName = new URL(graphQlUrl).hostname
@@ -105,4 +130,31 @@ function getTxnUrl(graphQlUrl: string, txnHash: string | undefined) {
     return `https://minascan.io/${networkName}/tx/${txnHash}?type=zk-tx`;
   }
   return `Transaction hash: ${txnHash}`;
+}
+
+async function registerName(name: CircuitString, nameObject: NameData) {
+  try {
+  let merkleProof = await smt.prove(name);
+
+  let tx = await Mina.transaction(feepayerAddress, () => {
+    zkApp.register(name, nameObject.eth_address, merkleProof);
+  });
+  await tx.prove();
+  sentTx = await tx.sign([feepayerKey]).send();
+
+  await smt.update(name, nameObject!);
+  zkApp.commitment.get().assertEquals(smt.getRoot());
+} catch (err) {
+  console.log(err);
+
+}
+if (sentTx?.hash() !== undefined) {
+  console.log(`
+Success! Update transaction sent.
+
+Your smart contract state will be updated
+as soon as the transaction is included in a block:
+${getTxnUrl(config.url, sentTx.hash())}
+`);
+}
 }

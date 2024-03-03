@@ -1,4 +1,14 @@
 {
   "version": 1,
-  "deployAliases": {}
+  "deployAliases": {
+    "berkeley": {
+      "networkId": "testnet",
+      "url": "https://proxy.berkeley.minaexplorer.com/graphql",
+      "keyPath": "keys/berkeley.json",
+      "feepayerKeyPath": "/Users/boraysaygilier/.cache/zkapp-cli/keys/testing-feepayer.json",
+      "feepayerAlias": "testing-feepayer",
+      "fee": "0.1",
+      "smartContract": "Resolver"
+    }
+  }
 }
