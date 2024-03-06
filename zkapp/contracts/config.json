@@ -9,6 +9,15 @@
       "feepayerAlias": "testing-feepayer",
       "fee": "0.1",
       "smartContract": "Resolver"
+    },
+    "berk": {
+      "networkId": "testnet",
+      "url": "https://proxy.berkeley.minaexplorer.com/graphql",
+      "keyPath": "keys/berk.json",
+      "feepayerKeyPath": "/Users/boraysaygilier/.cache/zkapp-cli/keys/berkkey.json",
+      "feepayerAlias": "berkkey",
+      "fee": "0.1",
+      "smartContract": "Resolver"
     }
   }
 }

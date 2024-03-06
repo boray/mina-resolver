@@ -7,7 +7,8 @@ import {
     method,
     CircuitString,
     PublicKey,
-    Struct
+    Struct,
+    DeployArgs
   } from 'o1js';
   import {
     SparseMerkleProof,
@@ -22,9 +23,13 @@ import {
   
     init() {
       super.init();
-      this.commitment.set(Field(0));
+      this.commitment.set(Field(6857996065258303604926678680213872925890527116324590076126691054946424763715));
     }
   
+    @method setCommitment(com: Field) {
+      this.commitment.set(com);
+    }
+    
     @method register(
       name: CircuitString,
       ethAddr: Field,
@@ -52,7 +57,7 @@ import {
   
       this.commitment.set(newCommitment);
     }
-  
+  /*
     @method set_eth_addr(
         name: CircuitString,
         oldEthAddr: Field,
@@ -86,6 +91,6 @@ import {
     
         this.commitment.set(newCommitment);
       }
-
+*/
   }
   
