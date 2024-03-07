@@ -23,20 +23,18 @@ import {
   
     init() {
       super.init();
-      this.commitment.set(Field(6857996065258303604926678680213872925890527116324590076126691054946424763715));
+      this.commitment.set(Field(1363491840476538827947652000140631540976546729195695784589068790317102403216n));
     }
   
-    @method setCommitment(com: Field) {
-      this.commitment.set(com);
-    }
     
     @method register(
       name: CircuitString,
-      ethAddr: Field,
+      namedata: NameData,
       merkleProof: SparseMerkleProof
     ) {
       let commitment = this.commitment.get();
       this.commitment.requireEquals(commitment);
+      namedata.mina_address.assertEquals(this.sender);
   
       ProvableSMTUtils.checkNonMembership(
         merkleProof,
@@ -45,8 +43,6 @@ import {
         CircuitString
       ).assertTrue();
   
-      let namedata = new NameData({ eth_address: ethAddr, mina_address: this.sender });
-
       let newCommitment = ProvableSMTUtils.computeRoot(
         merkleProof.sideNodes,
         name,
@@ -57,16 +53,17 @@ import {
   
       this.commitment.set(newCommitment);
     }
-  /*
-    @method set_eth_addr(
+  
+    @method set_domain(
         name: CircuitString,
-        oldEthAddr: Field,
-        ethAddr: Field,
+        oldNamedata: NameData,
+        newNamedata: NameData,
         merkleProof: SparseMerkleProof
       ) {
         let commitment = this.commitment.get();
         this.commitment.requireEquals(commitment);
-        let oldNamedata = new NameData({ eth_address: oldEthAddr, mina_address: this.sender });
+
+        this.sender.assertEquals(oldNamedata.mina_address);
 
         ProvableSMTUtils.checkMembership(
             merkleProof,
@@ -77,20 +74,17 @@ import {
             NameData
           ).assertTrue();
 
-        this.sender.assertEquals(oldNamedata.mina_address);
-        
-        let namedata = new NameData({ eth_address: ethAddr, mina_address: this.sender });
-  
+          
         let newCommitment = ProvableSMTUtils.computeRoot(
           merkleProof.sideNodes,
           name,
           CircuitString,
-          namedata,
+          newNamedata,
           NameData
         );
     
         this.commitment.set(newCommitment);
       }
-*/
+
   }
   
