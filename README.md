@@ -1,1 +1,2 @@
-# ens-resolver-on-mina
+# Mina Resolver
+Mina ENS Resolver offers free ENS subdomains without paying high gas fees on Ethereum L1. By implementing ENS Offchain Resolver architecture with CCIP-Read specified in ERC-3668, subdomains minted on Mina can be resolved on Ethereum from Mina. Subdomains minted on Mina will work same as domains minted on Ethereum L1. By offering free ENS names, Mina Resolver will promote Mina to Ethereum community.
