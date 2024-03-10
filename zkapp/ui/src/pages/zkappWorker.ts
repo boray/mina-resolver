@@ -1,11 +1,23 @@
-import { Mina, PublicKey, fetchAccount,CircuitString } from 'o1js';
-import { SparseMerkleProof } from 'o1js-merkle';
+import { Mina, PublicKey,Struct,Field, fetchAccount,CircuitString } from 'o1js';
+import {
+  MemoryStore,
+  MongoStore,
+  Store,
+  SMTUtils,
+  SparseMerkleTree,
+  ProvableSMTUtils,
+  SparseMerkleProof
+} from 'o1js-merkle';
+
+
 
 type Transaction = Awaited<ReturnType<typeof Mina.transaction>>;
 
+
 // ---------------------------------------------------------------------------------------
 
-import { NameData, type Resolver } from '../../../contracts/src/Resolver';
+import { NameData, type Resolver } from '../../../contracts/build/src/Resolver.js';
+
 
 const state = {
   Resolver: null as null | typeof Resolver,
@@ -42,27 +54,35 @@ const functions = {
     const currentCommitment = await state.zkapp!.commitment.get();
     return JSON.stringify(currentCommitment.toJSON());
   },
-  createRegisterTransaction: async (args: {domain: CircuitString, namedata: NameData, merkleProof: SparseMerkleProof }) => {
+  createRegisterTransaction: async () => {
+    // store these in state
     const transaction = await Mina.transaction(() => {
-      state.zkapp!.register(args.domain,args.namedata, args.merkleProof);
+      //state.zkapp!.register(domainCS,physborayethObj, proof);
     });
     state.transaction = transaction;
-  },
-  createSetSubdomainTransaction: async (args: {domain: CircuitString, oldNamedata: NameData, newNamedata: NameData, merkleProof: SparseMerkleProof }) => {
-    const transaction = await Mina.transaction(() => {
-      state.zkapp!.set_subdomain(args.domain,args.oldNamedata,args.newNamedata, args.merkleProof);
-    });
-    state.transaction = transaction;
+    
   },
   proveRegisterTransaction: async (args: {}) => {
     await state.transaction!.prove();
   },
-  proveSetSubdomainTransaction: async (args: {}) => {
-    await state.transaction!.prove();
-  },
   getTransactionJSON: async (args: {}) => {
     return state.transaction!.toJSON();
-  }
+  },
+
+  getNonMembershipProof: async (args: {}) => {
+    // return proof as SparseMerkleProof or fields
+    // the storage worker should return the new commitment so the process could be delayed for the tx processing.
+  },
+  getMembershipProof: async (args: {}) => {
+    // return proof as SparseMerkleProof or fields
+    // setSubdomain tx will use this -> wait for the tx -> when the commitment changes -> posts subdomain to storage worker
+    // SV proves by itself and update the stored kv
+  },
+  postSubdomain: async (args: {}) => {
+    // If expected commitment matches with the commitment on-chain, then post the name and namedata to the storage worker
+    // storage worker prove by itself and append to the storage
+  },
+
 };
 
 // ---------------------------------------------------------------------------------------

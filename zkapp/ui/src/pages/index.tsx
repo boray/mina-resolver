@@ -3,13 +3,6 @@ import Head from 'next/head';
 import Image from 'next/image';
 import { useEffect, useState} from 'react';
 import { PublicKey, Field, CircuitString ,PrivateKey } from 'o1js';
-import {
-  MemoryStore,
-  SMTUtils,
-  SparseMerkleTree,
-  ProvableSMTUtils,
-  SparseMerkleProof,
-} from 'o1js-merkle';
 import GradientBG from '../components/GradientBG.js';
 import styles from '../styles/Home.module.css';
 import heroMinaLogo from '../../public/assets/hero-mina-logo.svg';
@@ -142,7 +135,7 @@ export default function Home() {
   // Send a transaction
 
   const onSendTransaction = async () => {
-    /*
+    
     setState({ ...state, creatingTransaction: true });
 
     setDisplayText('Creating a transaction...');
@@ -153,22 +146,10 @@ export default function Home() {
     });
 
     let physborayethPriv = PrivateKey.random();
-    let physborayeth: CircuitString = CircuitString.fromString('phys.boray.eth');
-    let physborayethObj = new NameData({
-       eth_address: Field(1320),
-       mina_address: PublicKey.fromPrivateKey(physborayethPriv),
-      });
+    let physborayethPub =  PublicKey.fromPrivateKey(physborayethPriv);
+    let eth_address = 100001231;
     
-
-    let store = new MemoryStore<NameData>();
-    let smt = await SparseMerkleTree.build<CircuitString, NameData>(
-        store,
-        CircuitString,
-        NameData as any
-      );
-
-    let proof = await smt.prove(physborayeth);
-    await state.zkappWorkerClient!.createRegisterTransaction(physborayeth ,physborayethObj,proof);
+    await state.zkappWorkerClient!.createRegisterTransaction("phys.boray.eth" ,eth_address.toString(), physborayethPub.toBase58());
 
     setDisplayText('Creating proof...');
     console.log('Creating proof...');
@@ -185,7 +166,7 @@ export default function Home() {
       feePayer: {
         fee: transactionFee,
         memo: ''
-      }
+      },
     });
 
     const transactionLink = `https://berkeley.minaexplorer.com/transaction/${hash}`;
@@ -195,7 +176,8 @@ export default function Home() {
     setDisplayText(transactionLink);
 
     setState({ ...state, creatingTransaction: false });
-    */
+    
+    
   };
 
   // -------------------------------------------------------

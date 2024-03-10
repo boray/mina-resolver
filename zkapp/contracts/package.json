@@ -39,9 +39,10 @@
     "o1js": "0.16.*"
   },
   "dependencies": {
+    "aws4": "^1.12.0",
     "mongoose": "^8.2.0",
     "o1js": "0.16.*",
-    "o1js-merkle": "^0.1.0",
+    "o1js-merkle": "^0.1.1",
     "zkapp-cli": "^0.18.0"
   }
 }

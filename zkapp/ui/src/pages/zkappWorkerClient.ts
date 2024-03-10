@@ -1,6 +1,6 @@
 import { fetchAccount, PublicKey, Field, CircuitString } from 'o1js';
 import { SparseMerkleProof } from 'o1js-merkle';
-import { NameData } from '../../../contracts/src/Resolver.js';
+import { NameData } from '../../../contracts/build/src/Resolver.js';
 
 
 import type {
@@ -45,20 +45,12 @@ export default class ZkappWorkerClient {
     const result = await this._call('getCommitment', {});
     return Field.fromJSON(JSON.parse(result as string));
   }
-
-  createRegisterTransaction(domain: CircuitString, namedata: NameData, merkleProof: SparseMerkleProof) {
-    return this._call('createRegisterTransaction', {domain,namedata,merkleProof});
-  }
-  createSetSubdomainTransaction() {
-    return this._call('createSetSubdomainTransaction', {});
+  createRegisterTransaction() {
+    return this._call('createRegisterTransaction', {});
   }
   proveRegisterTransaction() {
     return this._call('proveRegisterTransaction', {});
   }
-  proveSetSubdomainTransaction() {
-    return this._call('proveRegisterTransaction', {});
-  }
-
   async getTransactionJSON() {
     const result = await this._call('getTransactionJSON', {});
     return result;
