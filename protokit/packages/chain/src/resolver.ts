@@ -17,6 +17,8 @@ import {
       NameData
     );
 
+    
+    
     @runtimeMethod()
     public register(name: Field, mina_address: PublicKey, eth_address:Field): void {
       assert(this.subdomain.get(name).isSome, "the subdomain is registered");

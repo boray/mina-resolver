@@ -2,10 +2,12 @@ import { create } from "zustand";
 import { Client, useClientStore } from "./client";
 import { immer } from "zustand/middleware/immer";
 import { PendingTransaction, UnsignedTransaction } from "@proto-kit/sequencer";
-import { Field, PublicKey, UInt64 } from "o1js";
+import { Field, PublicKey, UInt64, Encoding } from "o1js";
 import { useCallback, useEffect } from "react";
 import { useChainStore } from "./chain";
 import { useWalletStore } from "./wallet";
+
+
 
 export interface ResolverState {
   loading: boolean;
@@ -56,7 +58,9 @@ export const useResolverStore = create<
         set((state) => {
           state.loading = true;
         });
-  
+        const encoded: Field[] = Encoding.stringToFields(name)
+        const length : Field = Field(name.length)
+
         const namedata = await client.query.runtime.Resolver.subdomain.get(
          name
         );
