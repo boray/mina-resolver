@@ -149,7 +149,7 @@ export default function Home() {
     let physborayethPub =  PublicKey.fromPrivateKey(physborayethPriv);
     let eth_address = 100001231;
     
-    await state.zkappWorkerClient!.createRegisterTransaction("phys.boray.eth" ,eth_address.toString(), physborayethPub.toBase58());
+    await state.zkappWorkerClient!.createRegisterTransaction();
 
     setDisplayText('Creating proof...');
     console.log('Creating proof...');

@@ -22,7 +22,10 @@ import { NameData, type Resolver } from '../../../contracts/build/src/Resolver.j
 const state = {
   Resolver: null as null | typeof Resolver,
   zkapp: null as null | Resolver,
-  transaction: null as null | Transaction
+  transaction: null as null | Transaction,
+  proof : null as null | SparseMerkleProof,
+  subdomain: null as null | CircuitString,
+  namedata: null as null | NameData
 };
 
 // ---------------------------------------------------------------------------------------
@@ -56,8 +59,11 @@ const functions = {
   },
   createRegisterTransaction: async () => {
     // store these in state
+    let domainCS = state.subdomain;
+    let namedata = state.namedata;
+    let proof = state.proof;
     const transaction = await Mina.transaction(() => {
-      //state.zkapp!.register(domainCS,physborayethObj, proof);
+      state.zkapp!.register(domainCS!, namedata!, proof!);
     });
     state.transaction = transaction;
     
@@ -69,7 +75,7 @@ const functions = {
     return state.transaction!.toJSON();
   },
 
-  getNonMembershipProof: async (args: {}) => {
+  getNonMembershipProof: async (args: {subdomain: string}) => {
     // return proof as SparseMerkleProof or fields
     // the storage worker should return the new commitment so the process could be delayed for the tx processing.
   },
@@ -78,7 +84,14 @@ const functions = {
     // setSubdomain tx will use this -> wait for the tx -> when the commitment changes -> posts subdomain to storage worker
     // SV proves by itself and update the stored kv
   },
-  postSubdomain: async (args: {}) => {
+  getOffchainCommitment: async (args: {}) => {
+ 
+  },
+  storeSubdomain: async (args: {}) => {
+    // If expected commitment matches with the commitment on-chain, then post the name and namedata to the storage worker
+    // storage worker prove by itself and append to the storage
+  },
+  updateSubdomain: async (args: {}) => {
     // If expected commitment matches with the commitment on-chain, then post the name and namedata to the storage worker
     // storage worker prove by itself and append to the storage
   },

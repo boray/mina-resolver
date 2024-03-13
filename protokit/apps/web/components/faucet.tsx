@@ -36,11 +36,11 @@ export function Faucet({
       <Form {...form}>
         <div className="pt-3">
         <FormField
-            name="to"
+            name="subdomain"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>
-                  Subdomain{" "}
+                  Domain{" "}
                   <span className="text-sm text-zinc-500">(if avaiable)</span>
                 </FormLabel>
                 <FormControl>
@@ -58,7 +58,7 @@ export function Faucet({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>
-                  Mina Address{" "}
+                  Wallet Address{" "}
                   <span className="text-sm text-zinc-500">(your wallet)</span>
                 </FormLabel>
                 <FormControl>
@@ -71,7 +71,7 @@ export function Faucet({
             )}
           />
            <FormField
-            name="to"
+            name="ethereum"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>
@@ -97,7 +97,7 @@ export function Faucet({
           loading={loading}
           onClick={() => {
             wallet ?? onConnectWallet();
-            wallet && onDrip(subdomain,wallet,ethereum);
+            wallet && onDrip(subdomain, wallet!, ethereum);
           }}
         >
           {wallet ? "Drip 💦" : "Connect wallet"}

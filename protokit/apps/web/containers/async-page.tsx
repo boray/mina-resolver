@@ -16,7 +16,7 @@ export default function Home() {
           <Faucet
             wallet={wallet.wallet}
             onConnectWallet={wallet.connectWallet}
-            onDrip={register}
+            onDrip={(subdomain, wallet, ethereum) => register(subdomain, wallet, ethereum)}
             loading={false}
           />
         </div>

@@ -5,9 +5,7 @@ export class NameString extends Struct({
   len: Field
 }) {
 
-  constructor(str: string) {
-      const charFields = Encoding.stringToFields(str);
-      const lengthField = new Field(str.length);
+  constructor(charFields: Field[], lengthField: Field) {
       super({ chars: charFields, len: lengthField });
      }
   

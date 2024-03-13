@@ -6,7 +6,7 @@ import { Field, PublicKey, UInt64, Encoding } from "o1js";
 import { useCallback, useEffect } from "react";
 import { useChainStore } from "./chain";
 import { useWalletStore } from "./wallet";
-
+import { NameString } from "chain/dist/namestring";
 
 
 export interface ResolverState {
@@ -58,12 +58,14 @@ export const useResolverStore = create<
         set((state) => {
           state.loading = true;
         });
-        const encoded: Field[] = Encoding.stringToFields(name)
-        const length : Field = Field(name.length)
+        let bytes = new TextEncoder().encode(name);
+        let fields:Field[]= [];
+        bytes.map((x) => fields.push(Field(x)));
+        const lengthField = new Field(name.length);
 
-        const namedata = await client.query.runtime.Resolver.subdomain.get(
-         name
-        );
+        const namestring = new NameString(fields, lengthField);
+
+        const namedata = await client.query.runtime.Resolver.subdomain.get(namestring);
   
         set((state) => {
           state.loading = false;
@@ -73,9 +75,42 @@ export const useResolverStore = create<
     async register(client: Client, name: string, address: string, eth_address: string) {
         const resolver = client.runtime.resolve("Resolver");
         const sender = PublicKey.fromBase58(address);
-  
+        //-------
+        let bytes = new TextEncoder().encode(name);
+        let fields:Field[]= [];
+        bytes.map((x) => fields.push(Field(x)));
+        console.log(fields.toString());
+        //-----
+        //let charFields = Encoding.Bijective.Fp.fromString(name);
+        //console.log(Encoding.Bijective.Fp.toString(charFields));
+        const lengthField = new Field(name.length);
+        const namestring = new NameString(fields, lengthField);
+        // check eth_address is valid
+        // change base 10
+        // cast to field
         const tx = await client.transaction(sender, () => {
-          resolver.register(Field(name),sender, Field(eth_address));
+          resolver.register(namestring, sender, Field(eth_address));
+        });
+  
+        await tx.sign();
+        await tx.send();
+  
+        isPendingTransaction(tx.transaction);
+        return tx.transaction;
+      },
+      async set_subdomain(client: Client, name: string, address: string, eth_address: string) {
+        const resolver = client.runtime.resolve("Resolver");
+        const sender = PublicKey.fromBase58(address);
+        let bytes = new TextEncoder().encode(name);
+        let fields:Field[]= [];
+        bytes.map((x) => fields.push(Field(x)));
+        const lengthField = new Field(name.length);
+        const namestring = new NameString(fields, lengthField);
+        // check eth_address is valid
+        // change base 10
+        // cast to field
+        const tx = await client.transaction(sender, () => {
+          resolver.register(namestring, PublicKey.fromBase58(address), Field(eth_address));
         });
   
         await tx.sign();
@@ -119,13 +154,13 @@ export const useResolver = () => {
   const wallet = useWalletStore();
   const resolver = useResolverStore();
 
-  return useCallback(async () => {
+  return useCallback(async (name: string, mina_wallet: string, eth_address: string) => {
     if (!client.client || !wallet.wallet) return;
-
+    
     const pendingTransaction = await resolver.register(
       client.client,
       name,
-      wallet.wallet,
+      mina_wallet,
       eth_address
 
     );
