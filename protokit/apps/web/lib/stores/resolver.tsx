@@ -54,7 +54,7 @@ export const useResolverStore = create<
         state.balances[address] = balance?.toString() ?? "0";
       });
     },
-    async resolverName(client: Client, name: string) {
+    async resolveName(client: Client, name: string) {
         set((state) => {
           state.loading = true;
         });
@@ -62,7 +62,7 @@ export const useResolverStore = create<
         let fields:Field[]= [];
         bytes.map((x) => fields.push(Field(x)));
         const lengthField = new Field(name.length);
-
+        
         const namestring = new NameString(fields, lengthField);
 
         const namedata = await client.query.runtime.Resolver.subdomain.get(namestring);
@@ -88,8 +88,10 @@ export const useResolverStore = create<
         // check eth_address is valid
         // change base 10
         // cast to field
+        const ethereum_field = Field.from(eth_address);
+
         const tx = await client.transaction(sender, () => {
-          resolver.register(namestring, sender, Field(eth_address));
+          resolver.register(namestring, sender, ethereum_field);
         });
   
         await tx.sign();
