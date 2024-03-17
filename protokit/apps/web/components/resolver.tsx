@@ -13,19 +13,24 @@ export interface FaucetProps {
   subdomain?: string,
   loading: boolean;
   onConnectWallet: () => void;
-  onDrip: (name: string, address: string, eth_address: string) => void;
+  onRegister: (name: string, address: string, eth_address: string) => void;
 }
 
-export function Faucet({
+export function Resolver({
   wallet,
   onConnectWallet,
-  onDrip,
+  onRegister,
   loading,
 }: FaucetProps) {
   const form = useForm();
   const [subdomain, setSubdomain] = useState('');
   const [ethereum, setEthereum] = useState('');
+  const [looking, setLooking] = useState(false);
+
   return (
+    
+    ( looking ? (
+    
     <Card className="w-full p-4">
       <div className="mb-2">
         <h2 className="text-xl font-bold">Register</h2>
@@ -97,12 +102,54 @@ export function Faucet({
           loading={loading}
           onClick={() => {
             wallet ?? onConnectWallet();
-            wallet && onDrip(subdomain, wallet!, ethereum);
+            wallet && onRegister(subdomain, wallet!, ethereum);
           }}
         >
-          {wallet ? "Drip 💦" : "Connect wallet"}
+          {wallet ? "Register" : "Connect wallet"}
         </Button>
       </Form>
     </Card>
-  );
+  ) :
+   
+  <Card className="w-full p-4">
+      
+      <Form {...form}>
+        <div className="pt-3">
+        <FormField
+            name="subdomain"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Domain{" "}
+                  <span className="text-sm text-zinc-500">(if avaiable)</span>
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    value={subdomain}
+                    onChange={(event) => setSubdomain(event.target.value)}
+                    placeholder={"boray.mina.eth"}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
+
+      <Button
+          size={"lg"}
+          type="submit"
+          className="mt-6 w-full"
+          loading={loading}
+          onClick={() => {
+            wallet ?? onConnectWallet();
+            wallet && onRegister(subdomain, wallet!, ethereum);
+          }}
+        >
+          {wallet ? "Search" : "Connect wallet"}
+        </Button>
+      </Form>
+</Card>
+) 
+
+    );
 }
