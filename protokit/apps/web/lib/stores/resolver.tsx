@@ -7,6 +7,7 @@ import { useCallback, useEffect } from "react";
 import { useChainStore } from "./chain";
 import { useWalletStore } from "./wallet";
 import { NameString } from "chain/dist/namestring";
+import { NameData } from "chain/dist/namedata";
 
 
 export interface ResolverState {
@@ -16,12 +17,13 @@ export interface ResolverState {
     [key: string]: string;
   }; 
   subdomains: {
-    // address - balance
     [key: string]: string;
   };
+  lookupres?: string;
   loadBalance: (client: Client, address: string) => Promise<void>;
   faucet: (client: Client, address: string) => Promise<PendingTransaction>;
   register: (client: Client, name: string ,address: string, eth_address: string) => Promise<PendingTransaction>;
+  lookup:(client: Client, name: string) => Promise<NameData|undefined>;
 
 }
 
@@ -54,7 +56,7 @@ export const useResolverStore = create<
         state.balances[address] = balance?.toString() ?? "0";
       });
     },
-    async resolveName(client: Client, name: string) {
+    async lookup(client: Client, name: string) {
         set((state) => {
           state.loading = true;
         });
@@ -66,11 +68,12 @@ export const useResolverStore = create<
         const namestring = new NameString(fields, lengthField);
 
         const namedata = await client.query.runtime.Resolver.subdomain.get(namestring);
-  
         set((state) => {
           state.loading = false;
           state.subdomains[name] = namedata?.toString() ?? "0";
+          state.lookupres = namedata
         });
+        console.log(namedata);
       },
     async register(client: Client, name: string, address: string, eth_address: string) {
         const resolver = client.runtime.resolve("Resolver");
@@ -149,6 +152,24 @@ export const useObserveBalance = () => {
 
     resolver.loadBalance(client.client, wallet.wallet);
   }, [client.client, chain.block?.height, wallet.wallet]);
+};
+
+export const useLookup = () => {
+  const client = useClientStore();
+  const chain = useChainStore();
+  const wallet = useWalletStore();
+  const resolver = useResolverStore();
+
+
+  return useCallback(async (name: string) => {
+    if (!client.client || !wallet.wallet) return;
+    
+    const lookup = await resolver.lookup(
+      client.client,
+      name,
+    );
+    
+  }, [client.client, wallet.wallet]);
 };
 
 export const useResolver = () => {
