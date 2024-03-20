@@ -42,38 +42,44 @@ export const database: Database = {
   },
 };
 
-async function fetchOffchainName(_name: string): Promise<NameData> {
+async function fetchOffchainName(name: string): Promise<NameData> {
   try {
-    /*
-    const response = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${kvAccountId}/storage/kv/namespaces/${kvNamespace}/values/${name}`, {
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${kvToken}`
-          },
-          method: "GET",
-          body: "",
-          redirect: "follow"
+    let bytes = new TextEncoder().encode(name);
+    let length = bytes.length.toString();
+    let chars = bytes.join().split(',')    
+  const response = await fetch('http://127.0.0.1:8080/graphql', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    query: `
+    query ResolverSubdomain($chars: [String], $len: String) {
+        runtime {
+          Resolver {
+            subdomain(key: {len: $len, chars: $chars}) {
+              eth_address
+              mina_address
+            }
+          }
         }
-      );
-    */
+      }`,
+      variables: {chars: chars,len: length}}
+ ),
+}) 
+const data = await response.json();
+let ethereum_address = data.data.runtime.Resolver.subdomain.eth_address;
+let mina_address = data.data.runtime.Resolver.subdomain.mina_address;
+const scheme =     {
+    "addresses": {
+      '60': '',
+      '12586': '',
+    }
+};
+scheme.addresses[60] = ethereum_address;
+scheme.addresses[12586] = mina_address;
 
-    const dummy_json = {
-      addresses: {
-        '60': '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
-        '12586': 'B62qjaVRQayzu3HC5yG5LotKqardP9xJDfhqTReMuNLHZ66Es4BckHA',
-      },
-      text: {
-        email: 'vitalik@ethereum.org',
-        description: 'hello offchainresolver record',
-      },
-      contenthash:
-        '0xe301017012204edd2984eeaf3ddf50bac238ec95c5713fb40b5e428b508fdbe55d3b9f155ffe',
-    };
-    const data = dummy_json as NameData;
-
-    //const data = (await response.json()) as NameData;
-    return data;
+    return scheme as NameData;
   } catch (err) {
     console.error('Error fetching offchain name', err);
     return {};
