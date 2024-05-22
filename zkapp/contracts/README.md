@@ -1,4 +1,4 @@
-# Mina zkApp: Zkapp
+# Mina Resolver zkApp
 
 This template uses TypeScript.
 

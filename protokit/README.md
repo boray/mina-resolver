@@ -1,4 +1,4 @@
-# Protokit starter-kit
+# Mina Resolver Protokit Appchain
 
 This repository is a monorepo aimed at kickstarting application chain development using the Protokit framework.
 
