@@ -1,279 +1,206 @@
-/**
- * This script can be used to interact with the Add contract, after deploying it.
- *
- * We call the update() method on the contract, create a proof and send it to the chain.
- * The endpoint that we interact with is read from your config.json.
- *
- * This simulates a user interacting with the zkApp from a browser, except that here, sending the transaction happens
- * from the script and we're using your pre-funded zkApp account to pay the transaction fee. In a real web app, the user's wallet
- * would send the transaction and pay the fee.
- *
- * To run locally:
- * Build the project: `$ npm run build`
- * Run with node:     `$ node build/src/interact.js <deployAlias>`.
- */
 import fs from 'fs/promises';
 import { AccountUpdate, CircuitString, Field, Mina, NetworkId, PrivateKey, Struct, PublicKey, fetchAccount} from 'o1js';
-import { Resolver } from './Resolver.js';
-import {
-  MemoryStore,
-  SMTUtils,
-  SparseMerkleTree,
-  ProvableSMTUtils,
-  SparseMerkleProof
-} from 'o1js-merkle';
-import { console_log } from 'o1js/dist/node/bindings/compiled/node_bindings/plonk_wasm.cjs';
-
-class NameData extends Struct({ eth_address: Field, mina_address: PublicKey }){}
+import { Resolver, offchainState, DomainRecord, String} from './Resolver.js';
 
 
-const useProof = false;
+// check command line arg
+let deployAlias = process.argv[2];
+if (!deployAlias)
+  throw Error(`Missing <deployAlias> argument.
 
-const Local = Mina.LocalBlockchain({ proofsEnabled: useProof });
-Mina.setActiveInstance(Local);
-const { privateKey: deployerKey, publicKey: deployerAccount } =
-  Local.testAccounts[0];
+Usage:
+node build/src/interact.js <deployAlias>
+`);
+Error.stackTraceLimit = 1000;
+const DEFAULT_NETWORK_ID = 'testnet';
 
-
-// ----------------------------------------------------
-let commitment: Field = Field(0);
-
-let store = new MemoryStore<NameData>();
-let smt = await SparseMerkleTree.build<CircuitString, NameData>(
-  store,
-  CircuitString,
-  NameData as any
+// parse config and private key from file
+type Config = {
+  deployAliases: Record<
+    string,
+    {
+      networkId?: string;
+      url: string;
+      keyPath: string;
+      fee: string;
+      feepayerKeyPath: string;
+      feepayerAlias: string;
+    }
+  >;
+};
+let configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
+let config = configJson.deployAliases[deployAlias];
+console.log(config)
+let feepayerKeysBase58: { privateKey: string; publicKey: string } = JSON.parse(
+  await fs.readFile(config.feepayerKeyPath, 'utf8')
 );
 
-let mathborayethPriv = Local.testAccounts[1].privateKey;
-let mathborayeth: CircuitString = CircuitString.fromString("math.boray.eth");
-let mathborayethObj = new NameData({
-  eth_address: Field(22131),
-  mina_address: PublicKey.fromPrivateKey(mathborayethPriv)
+let zkAppKeysBase58: { privateKey: string; publicKey: string } = JSON.parse(
+  await fs.readFile(config.keyPath, 'utf8')
+);
+
+let feepayerKey = PrivateKey.fromBase58(feepayerKeysBase58.privateKey);
+let zkAppKey = PrivateKey.fromBase58(zkAppKeysBase58.privateKey);
+
+// set up Mina instance and contract we interact with
+const Network = Mina.Network({
+  // We need to default to the testnet networkId if none is specified for this deploy alias in config.json
+  // This is to ensure the backward compatibility.
+  archive: "https://api.minascan.io/archive/devnet/v1/graphql",
+  networkId: (config.networkId ?? DEFAULT_NETWORK_ID) as NetworkId,
+  mina: config.url,
 });
-
-let physborayethPriv = Local.testAccounts[2].privateKey;
-let physborayeth: CircuitString = CircuitString.fromString("phys.boray.eth");
-let physborayethObj = new NameData({
-  eth_address: Field(1320),
-  mina_address: PublicKey.fromPrivateKey(physborayethPriv)
-});
-
-let ecborayethPriv = Local.testAccounts[3].privateKey;
-let ecborayeth: CircuitString = CircuitString.fromString("ec.boray.eth");
-let ecborayethObj = new NameData({
-  eth_address: Field(12312),
-  mina_address: PublicKey.fromPrivateKey(ecborayethPriv)
-});
-
-
-commitment = smt.getRoot();
-//console.log('initial state must be:',commitment.toString());
-
-// --------------------------------------------------
-// ----------------------------------------------------
-
-// create a destination we will deploy the smart contract to
-const zkAppPrivateKey = PrivateKey.random();
-const zkAppAddress = zkAppPrivateKey.toPublicKey();
-
-const zkAppInstance = new Resolver(zkAppAddress);
-const deployTxn = await Mina.transaction(deployerAccount, () => {
-  AccountUpdate.fundNewAccount(deployerAccount);
-  zkAppInstance.deploy();
-  zkAppInstance.init();
-  
-  //zkAppInstance.setCommitment(initialCommitment);
-});
-await deployTxn.prove();
-await deployTxn.sign([deployerKey, zkAppPrivateKey]).send();
-
-// get the initial state of IncrementSecret after deployment
-const num0 = zkAppInstance.commitment.get();
-console.log('state after init:', num0.toString());
-
-// ----------------------------------------------------
-
+// const Network = Mina.Network(config.url);
+const fee = Number(config.fee) * 1e9; // in nanomina (1 billion = 1.0 mina)
+Mina.setActiveInstance(Network);
+let tx;
+let feepayerAddress = feepayerKey.toPublicKey();
+let zkAppAddress = zkAppKey.toPublicKey();
+let resolver_contract = new Resolver(zkAppAddress);
+offchainState.setContractInstance(resolver_contract);
 
 // compile the contract to create prover keys
-//console.log('compile the contract...');
-//await Resolver.compile();
-/*
-let tx = await Mina.transaction({sender: feepayerAddress, fee: txfee}, () => {
+console.time('compile program');
+await offchainState.compile();
+console.timeEnd('compile program');
+console.time('compile contract');
+await Resolver.compile();
+console.timeEnd('compile contract');
+
+
+
+console.time('deploy');
+try {
+tx = await Mina.transaction({ sender: feepayerAddress, fee }, async () => {
   AccountUpdate.fundNewAccount(feepayerAddress);
-  zkApp.init();
-});
+  await resolver_contract.deploy();
+})
 await tx.prove();
-await tx.sign([feepayerKey]).send();
+console.log('send transaction...');
+const sentTx = await tx.sign([feepayerKey,zkAppKey]).send();
+if (sentTx.status === 'pending') {
+  console.log(
+    '\nSuccess! Update transaction sent.\n' +
+      '\nYour smart contract state will be updated' +
+      '\nas soon as the transaction is included in a block:' +
+      `\n${getTxnUrl(config.url, sentTx.hash)}`
+  );
+}
+}
+catch (err) {
+  console.log(err);
+}
+console.timeEnd('deploy');
+
+
+console.time('register first name');
+try {
+tx = await Mina.transaction({ sender: feepayerAddress, fee }, async () => {
+  let new_record = new DomainRecord({ eth_address: Field(12312), mina_address: feepayerAddress});
+  await resolver_contract.register(String.fromString("boray.kimchi.eth"), new_record );
+
+})
+  await tx.prove();
+  console.log('send transaction...');
+  const sentTx = await tx.sign([feepayerKey]).send();
+  if (sentTx.status === 'pending') {
+    console.log(
+      '\nSuccess! Update transaction sent.\n' +
+        '\nYour smart contract state will be updated' +
+        '\nas soon as the transaction is included in a block:' +
+        `\n${getTxnUrl(config.url, sentTx.hash)}`
+    );
+  }
+}
+catch (err){
+  console.log(err);
+}
+console.timeEnd('register first name');
+
+
+/*
+console.time('register second name');
+tx = await Mina.transaction({ sender: feepayerAddress, fee }, async () => {
+  let new_record = new DomainRecord({ eth_address: Field(12312), mina_address: account_two });
+  await resolver_contract.register(String.fromString("test.kimchi.eth"),new_record );
+
+})
+  .sign([account_two.key])
+  .prove()
+  .send();
+console.log(tx.toPretty());
+console.timeEnd('register second name');
+
 */
 
-// --------
+console.time('settlement proof 1');
+let proof = await offchainState.createSettlementProof();
+console.timeEnd('settlement proof 1');
 
+console.time('settle 1');
+try {
+tx = await Mina.transaction({ sender: feepayerAddress, fee }, () => resolver_contract.settle(proof))
+await tx.prove()
 
-let proof = await smt.prove(mathborayeth);
-
-let isOk =  ProvableSMTUtils.checkNonMembership(
-  proof,
-  commitment,
-  mathborayeth,
-  CircuitString
-);
-console.log("Non-membership OK",isOk.toBoolean());
-
-let newCommitment = ProvableSMTUtils.computeRoot(
-  proof.sideNodes,
-  mathborayeth,
-  CircuitString,
-  mathborayethObj,
-  NameData
-);
-
-console.log("new commitment compute root:", newCommitment.toString());
-await registerName(mathborayethPriv,PublicKey.fromPrivateKey(mathborayethPriv),mathborayeth, mathborayethObj);
-//await set_eth_addr(physborayeth,Field(1320), Field(31));
-// Create a merkle proof for a key against the current root.
-commitment = await smt.update(mathborayeth, mathborayethObj);
-proof = await smt.prove(mathborayeth);
-// Check membership in the circuit, isOk should be true.
-console.log("commitment after smt.update",commitment.toString());
+console.log('send transaction...');
+const sentTx = await tx.sign([feepayerKey]).send();
+if (sentTx.status === 'pending') {
+  console.log(
+    '\nSuccess! Update transaction sent.\n' +
+      '\nYour smart contract state will be updated' +
+      '\nas soon as the transaction is included in a block:' +
+      `\n${getTxnUrl(config.url, sentTx.hash)}`
+  );
+}
+}
+catch (err){
+console.log(err);
+}
+console.timeEnd('settle 1');
 
 
 
-isOk = ProvableSMTUtils.checkMembership(
-  proof,
-  commitment,
-  mathborayeth,
-  CircuitString,
-  mathborayethObj,
-  NameData
-);
-console.log("Membership OK",isOk.toBoolean());
+console.time('get second name');
+  try {
+    tx = await Mina.transaction({ sender: feepayerAddress, fee }, async () => {
+      let new_record = new DomainRecord({
+        eth_address: Field(12312),
+        mina_address: feepayerAddress
+      });
+      let res = await resolver_contract.get_subdomain(String.fromString("boray.kimchi.eth"));
+      console.log(res);
+      res.eth_address.assertEquals(new_record.eth_address);
+      res.mina_address.assertEquals(new_record.mina_address);
+    })
+    await tx.prove();
+    console.log('send transaction...');
+    const sentTx = await tx.sign([feepayerKey,zkAppKey]).send();
+    if (sentTx.status === 'pending') {
+      console.log(
+        '\nSuccess! Update transaction sent.\n' +
+          '\nYour smart contract state will be updated' +
+          '\nas soon as the transaction is included in a block:' +
+          `\n${getTxnUrl(config.url, sentTx.hash)}`
+      );
+    }
+    }
+  catch (err) {
+      console.log(err);
+    }
 
-let commfetch =  zkAppInstance.commitment.get()
-
-console.log("fetched commitment after update",commfetch?.toString())
-
- let mathborayethObjNew = new NameData({
-  eth_address: Field(31),
-  mina_address: PublicKey.fromPrivateKey(mathborayethPriv)
-});
-await set_eth_addr(mathborayethPriv,PublicKey.fromPrivateKey(mathborayethPriv),mathborayeth,mathborayethObj,mathborayethObjNew);
-
-let objlast = await smt.get(mathborayeth);
-console.log("updated eth address:",objlast?.eth_address.toString());
-
-
-////
-
- mathborayethObjNew = new NameData({
-  eth_address: Field(69),
-  mina_address: PublicKey.fromPrivateKey(mathborayethPriv)
-});
-objlast = await smt.get(mathborayeth);
-await set_eth_addr(mathborayethPriv,PublicKey.fromPrivateKey(mathborayethPriv),mathborayeth,objlast!,mathborayethObjNew);
-objlast = await smt.get(mathborayeth);
-console.log("updated eth address:",objlast?.eth_address.toString());
+console.timeEnd('get second name');
 
 
-
-await registerName(physborayethPriv,PublicKey.fromPrivateKey(physborayethPriv),physborayeth, physborayethObj);
-
-let physborayethObjNew = new NameData({
-  eth_address: Field(69),
-  mina_address: PublicKey.fromPrivateKey(physborayethPriv)
-});
-objlast = await smt.get(physborayeth);
-await set_eth_addr(physborayethPriv,PublicKey.fromPrivateKey(physborayethPriv),physborayeth,objlast!,physborayethObjNew);
-objlast = await smt.get(physborayeth);
-console.log("updated eth address for phys:",objlast?.eth_address.toString());
-
-// --------
-/*
 function getTxnUrl(graphQlUrl: string, txnHash: string | undefined) {
   const txnBroadcastServiceName = new URL(graphQlUrl).hostname
     .split('.')
     .filter((item) => item === 'minascan' || item === 'minaexplorer')?.[0];
   const networkName = new URL(graphQlUrl).hostname
     .split('.')
-    .filter((item) => item === 'berkeley' || item === 'testworld')?.[0];
+    .filter((item) => item === 'devnet' || item === 'testworld')?.[0];
   if (txnBroadcastServiceName && networkName) {
     return `https://minascan.io/${networkName}/tx/${txnHash}?type=zk-tx`;
   }
   return `Transaction hash: ${txnHash}`;
 }
-*/
 
-async function registerName(signerKey: PrivateKey, signerAccount: PublicKey,name: CircuitString, nameObject: NameData) {
-
-
-  try {
-  let merkleProof = await smt.prove(name);
-
-  let tx = await Mina.transaction(signerAccount, () => {
-    zkAppInstance.register(name, nameObject, merkleProof);
-  });
-  await tx.prove();
-  await tx.sign([signerKey]).send();
-  await smt.update(name, nameObject!);
-  let newCommitment = await zkAppInstance.commitment.fetch()
-  newCommitment?.assertEquals(smt.getRoot());
-} catch (err) {
-  console.log(err);
-
-}
-
-}
-
-async function set_eth_addr( 
-  signerKey: PrivateKey, signerAccount: PublicKey,
-  name: CircuitString,
-  oldNamedata: NameData,
-  newNamedata: NameData) {
-
-
-  try {
-  let merkleProof = await smt.prove(name);
-
-  let tx = await Mina.transaction(signerAccount, () => {
-    zkAppInstance.set_subdomain(name, oldNamedata, newNamedata, merkleProof);
-  });
-  await tx.prove();
-  await tx.sign([signerKey]).send();
-
-  await smt.update(name, newNamedata);
-  let newCommitment = await zkAppInstance.commitment.fetch()
-  newCommitment?.assertEquals(smt.getRoot());
-} catch (err) {
-  console.log(err);
-
-}
-
-}
-
-/*
-async function setCommitment(commitment: Field) {
-
-  try {
-
-  let tx = await Mina.transaction({sender: feepayerAddress, fee: txfee}, () => {
-    zkApp.setCommitment(commitment);;
-  });
-  await tx.prove();
-  sentTx = await tx.sign([feepayerKey]).send();
-
-  zkApp.commitment.get().assertEquals(smt.getRoot());
-} catch (err) {
-  console.log(err);
-
-}
-if (sentTx?.hash() !== undefined) {
-  console.log(`
-Success! Update transaction sent.
-
-Your smart contract state will be updated
-as soon as the transaction is included in a block:
-${getTxnUrl(config.url, sentTx.hash())}
-`);
-}
-}
-*/

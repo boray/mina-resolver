@@ -1,5 +1,12 @@
 import { Database } from './server';
 import { EMPTY_CONTENT_HASH, ETH_COIN_TYPE, ZERO_ADDRESS } from './constants';
+import { ethers } from 'ethers';
+import {
+  Resolver,
+  DomainRecord,
+  offchainState,
+} from '../../zkapp/contracts/build/src/Resolver';
+import { PublicKey, Mina, PrivateKey, Field } from 'o1js';
 
 interface NameData {
   addresses?: { [coinType: number]: string };
@@ -23,7 +30,6 @@ export const database: Database = {
     }
   },
   async text(name: string, key: string) {
-
     try {
       const nameData: NameData = await fetchOffchainName(name);
       const value = nameData?.text?.[key] || '';
@@ -39,41 +45,37 @@ export const database: Database = {
 };
 
 async function fetchOffchainName(name: string): Promise<NameData> {
+  const zkAppAddress = PublicKey.empty();
+  const sender_key = PrivateKey.random();
+  const sender = PublicKey.fromPrivateKey(sender_key);
+
+  let resolver_contract = new Resolver(zkAppAddress);
+  offchainState.setContractInstance(resolver_contract);
+
+  let res: Record;
+  let ethereum_address = '0x0000000000000000000000000000000000000000';
   try {
-    let bytes = new TextEncoder().encode(name);
-    let length = bytes.length.toString();
-    let chars = bytes.join().split(',');   
-    const response = await fetch('http://127.0.0.1:8080/graphql', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    query: `
-    query ResolverSubdomain($chars: [String], $len: String) {
-        runtime {
-          Resolver {
-            subdomain(key: {len: $len, chars: $chars}) {
-              eth_address
-              mina_address
-            }
-          }
-        }
-      }`,
-      variables: {chars: chars,len: length}}
- ),
-}) 
-const data = await response.json();
-let ethereum_address = data.data.runtime.Resolver.subdomain.eth_address;
-let mina_address = data.data.runtime.Resolver.subdomain.mina_address;
-const scheme =     {
-    "addresses": {
-      '60': '',
-      '12586': '',
-    }
-};
-scheme.addresses[60] = ethereum_address;
-scheme.addresses[12586] = mina_address;
+    const namehash = ethers.utils.namehash(name);
+    console.log(namehash);
+    let namefield = BigInt(namehash);
+
+    let tx = await Mina.transaction(sender, async () => {
+      res = await resolver_contract.get_subdomain(Field(namefield));
+    })
+      .sign([sender_key])
+      .prove()
+      .send();
+
+    ethereum_address = res!.eth_address.toBigInt().toString(16);
+    console.log(ethereum_address);
+    const scheme = {
+      addresses: {
+        '60': '',
+        '0': '',
+      },
+    };
+    scheme.addresses[60] = ethereum_address;
+    //scheme.addresses[0] = fuel_address;
 
     return scheme as NameData;
   } catch (err) {

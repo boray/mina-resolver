@@ -1,46 +1,40 @@
-import { Mina, PublicKey,Struct,Field, fetchAccount,CircuitString } from 'o1js';
-import {
-  MemoryStore,
-  MongoStore,
-  Store,
-  SMTUtils,
-  SparseMerkleTree,
-  ProvableSMTUtils,
-  SparseMerkleProof
-} from 'o1js-merkle';
-
-
+import { Mina, PublicKey,Struct,Field, fetchAccount,CircuitString, PrivateKey } from 'o1js';
 
 type Transaction = Awaited<ReturnType<typeof Mina.transaction>>;
 
 
 // ---------------------------------------------------------------------------------------
 
-import { NameData, type Resolver } from '../../../contracts/build/src/Resolver.js';
+import { DomainRecord, String, type offchainState, type Resolver } from '../../../contracts/build/src/Resolver.js';
 
 
 const state = {
   Resolver: null as null | typeof Resolver,
   zkapp: null as null | Resolver,
   transaction: null as null | Transaction,
-  proof : null as null | SparseMerkleProof,
   subdomain: null as null | CircuitString,
-  namedata: null as null | NameData
+  namedata: null as null | DomainRecord,
+  offchain: null as null | any
 };
 
 // ---------------------------------------------------------------------------------------
 
 const functions = {
-  setActiveInstanceToBerkeley: async (args: {}) => {
-    const Berkeley = Mina.Network(
-      'https://api.minascan.io/node/berkeley/v1/graphql'
+  setActiveInstanceToDevnet: async (args: {}) => {
+    const Devnet = Mina.Network(
+      'https://api.minascan.io/node/devnet/v1/graphql'
     );
-    console.log('Berkeley Instance Created');
-    Mina.setActiveInstance(Berkeley);
+    console.log('Devnet Instance Created');
+    Mina.setActiveInstance(Devnet);
   },
   loadContract: async (args: {}) => {
-    const { Resolver } = await import('../../../contracts/build/src/Resolver.js');
+    const { Resolver, offchainState } = await import('../../../contracts/build/src/Resolver.js');
     state.Resolver = Resolver;
+    state.offchain = offchainState;
+  },
+  compileZkProgram: async (args: {}) => {
+    await state.offchain!.compile();
+
   },
   compileContract: async (args: {}) => {
     await state.Resolver!.compile();
@@ -52,18 +46,20 @@ const functions = {
   initZkappInstance: async (args: { publicKey58: string }) => {
     const publicKey = PublicKey.fromBase58(args.publicKey58);
     state.zkapp = new state.Resolver!(publicKey);
+    const {  offchainState } = await import('../../../contracts/build/src/Resolver.js');
+    offchainState.setContractInstance(state.zkapp);
   },
+  /*
   getCommitment: async (args: {}) => {
     const currentCommitment = await state.zkapp!.commitment.get();
     return JSON.stringify(currentCommitment.toJSON());
   },
-  createRegisterTransaction: async () => {
+  */
+  createRegisterTransaction: async (args: {subdomain: string, mina_adress: string, eth_address: Field}) => {
     // store these in state
-    let domainCS = state.subdomain;
-    let namedata = state.namedata;
-    let proof = state.proof;
-    const transaction = await Mina.transaction(() => {
-      state.zkapp!.register(domainCS!, namedata!, proof!);
+    let record = new DomainRecord({ eth_address: args.eth_address, mina_address: PublicKey.fromBase58(args.mina_adress)});
+    const transaction = await Mina.transaction(async () => {
+      state.zkapp!.register(String.fromString(args.subdomain), record);
     });
     state.transaction = transaction;
     
@@ -71,31 +67,34 @@ const functions = {
   proveRegisterTransaction: async (args: {}) => {
     await state.transaction!.prove();
   },
+
+  createCheckTransaction: async (args: {subdomain: string}) => {
+    // store these in state
+    let res;
+    const transaction = await Mina.transaction(async () => {
+      res = await state.zkapp!.get_subdomain(String.fromString(args.subdomain));
+    });
+    state.transaction = transaction;
+    return res;
+    
+  },
+  proveCheckTransaction: async (args: {}) => {
+    await state.transaction!.prove();
+  },
   getTransactionJSON: async (args: {}) => {
     return state.transaction!.toJSON();
   },
-
-  getNonMembershipProof: async (args: {subdomain: string}) => {
-    // return proof as SparseMerkleProof or fields
-    // the storage worker should return the new commitment so the process could be delayed for the tx processing.
+  /*
+  getSubdomain: async (args: {subdomain: string}) => {
+    
   },
-  getMembershipProof: async (args: {}) => {
-    // return proof as SparseMerkleProof or fields
-    // setSubdomain tx will use this -> wait for the tx -> when the commitment changes -> posts subdomain to storage worker
-    // SV proves by itself and update the stored kv
-  },
-  getOffchainCommitment: async (args: {}) => {
+  setSubdomain: async (args: {subdomain: string, }) => {
  
   },
-  storeSubdomain: async (args: {}) => {
-    // If expected commitment matches with the commitment on-chain, then post the name and namedata to the storage worker
-    // storage worker prove by itself and append to the storage
-  },
-  updateSubdomain: async (args: {}) => {
-    // If expected commitment matches with the commitment on-chain, then post the name and namedata to the storage worker
-    // storage worker prove by itself and append to the storage
-  },
-
+  register: async (args: {subdomain: string, eth_address: string ,mina_address: string}) => {
+  
+  }
+  */
 };
 
 // ---------------------------------------------------------------------------------------

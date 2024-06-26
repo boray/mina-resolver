@@ -2,17 +2,21 @@
 import Head from 'next/head';
 import Image from 'next/image';
 import { useEffect, useState} from 'react';
-import { PublicKey, Field, CircuitString ,PrivateKey } from 'o1js';
+import { PublicKey, Field ,PrivateKey } from 'o1js';
 import GradientBG from '../components/GradientBG.js';
 import styles from '../styles/Home.module.css';
 import heroMinaLogo from '../../public/assets/hero-mina-logo.svg';
 import arrowRightSmall from '../../public/assets/arrow-right-small.svg';
 import './reactCOIServiceWorker';
 import ZkappWorkerClient from './zkappWorkerClient';
-import { NameData } from '../../../contracts/build/src/Resolver.js';
+import { DomainRecord } from '../../../contracts/build/src/Resolver.js';
+import { Link } from '@/components/Link';
+import { Input } from '@/components/Input';
+import { Button } from '@/components/Button';
+
 
 let transactionFee = 0.1;
-const ZKAPP_ADDRESS = 'B62qjSAyL1cf6SLWuEPuJMP4CDenrsmFWTBRcwcscBmrh97hHwwxwFp';
+const ZKAPP_ADDRESS = 'B62qpWE66ruNRSoGZU8jwBGWzvHTvWPkG6wB26hiLSLyLYBEFafnUkG';
 
 export default function Home() {
 
@@ -21,10 +25,12 @@ export default function Home() {
     hasWallet: null as null | boolean,
     hasBeenSetup: false,
     accountExists: false,
-    currentCommitment: null as null | Field,
     publicKey: null as null | PublicKey,
     zkappPublicKey: null as null | PublicKey,
-    creatingTransaction: false
+    creatingTransaction: false,
+    free: true,
+    ethereum: "",
+    subdomain: ""
   });
 
   const [displayText, setDisplayText] = useState('');
@@ -52,7 +58,7 @@ export default function Home() {
         setDisplayText('Done loading web worker');
         console.log('Done loading web worker');
 
-        await zkappWorkerClient.setActiveInstanceToBerkeley();
+        await zkappWorkerClient.setActiveInstanceToDevnet();
 
         const mina = (window as any).mina;
 
@@ -77,21 +83,31 @@ export default function Home() {
 
         await zkappWorkerClient.loadContract();
 
+        const zkappPublicKey = PublicKey.fromBase58(ZKAPP_ADDRESS);
+
+
+  
+        console.log('Compiling zkProgram...');
+        setDisplayText('Compiling zkProgram...');
+        await zkappWorkerClient.compileZkProgram();
+        console.log('zkProgram compiled');
+        setDisplayText('zkProgram compiled...');
+
         console.log('Compiling zkApp...');
         setDisplayText('Compiling zkApp...');
         await zkappWorkerClient.compileContract();
         console.log('zkApp compiled');
         setDisplayText('zkApp compiled...');
-
-        const zkappPublicKey = PublicKey.fromBase58(ZKAPP_ADDRESS);
-
+        
         await zkappWorkerClient.initZkappInstance(zkappPublicKey);
+
+     
 
         console.log('Getting zkApp state...');
         setDisplayText('Getting zkApp state...');
         await zkappWorkerClient.fetchAccount({ publicKey: zkappPublicKey });
-        const currentCommitment = await zkappWorkerClient.getCommitment();
-        console.log(`Current state in zkApp: ${currentCommitment.toString()}`);
+        // const currentCommitment = await zkappWorkerClient.getCommitment();
+         // console.log(`Current state in zkApp: ${currentCommitment.toString()}`);
         setDisplayText('');
 
         setState({
@@ -101,8 +117,7 @@ export default function Home() {
           hasBeenSetup: true,
           publicKey,
           zkappPublicKey,
-          accountExists,
-          currentCommitment
+          accountExists
         });
       }
     })();
@@ -134,7 +149,7 @@ export default function Home() {
   // -------------------------------------------------------
   // Send a transaction
 
-  const onSendTransaction = async () => {
+  const onSendRegisterTransaction = async () => {
     
     setState({ ...state, creatingTransaction: true });
 
@@ -144,12 +159,11 @@ export default function Home() {
     await state.zkappWorkerClient!.fetchAccount({
       publicKey: state.publicKey!
     });
-
-    let physborayethPriv = PrivateKey.random();
-    let physborayethPub =  PublicKey.fromPrivateKey(physborayethPriv);
-    let eth_address = 100001231;
     
-    await state.zkappWorkerClient!.createRegisterTransaction();
+    const subdomain = state.subdomain;
+    const normalized = subdomain.slice(-9) == '.kimchi.eth' && subdomain.length > 9;
+    const ethereum_field = Field(BigInt(state.ethereum));
+    await state.zkappWorkerClient!.createRegisterTransaction(subdomain,state.publicKey!.toBase58() ,ethereum_field);
 
     setDisplayText('Creating proof...');
     console.log('Creating proof...');
@@ -169,7 +183,7 @@ export default function Home() {
       },
     });
 
-    const transactionLink = `https://berkeley.minaexplorer.com/transaction/${hash}`;
+    const transactionLink = `https://devnet.minaexplorer.com/transaction/${hash}`;
     console.log(`View transaction at ${transactionLink}`);
 
     setTransactionLink(transactionLink);
@@ -180,9 +194,53 @@ export default function Home() {
     
   };
 
+
+  const onSendCheckTransaction = async () => {
+
+    setState({ ...state, creatingTransaction: true });
+
+    setDisplayText('Creating a transaction...');
+    console.log('Creating a transaction...');
+
+    await state.zkappWorkerClient!.fetchAccount({
+      publicKey: state.publicKey!
+    });
+    
+    const subdomain = state.subdomain;
+    const normalized = subdomain.slice(-9) == '.kimchi.eth' && subdomain.length > 9;
+    const record = await state.zkappWorkerClient!.createCheckTransaction(subdomain);
+
+    setDisplayText('Creating proof...');
+    console.log('Creating proof...');
+    await state.zkappWorkerClient!.proveCheckTransaction();
+
+    console.log('Requesting send transaction...');
+    setDisplayText('Requesting send transaction...');
+    const transactionJSON = await state.zkappWorkerClient!.getTransactionJSON();
+
+    setDisplayText('Getting transaction JSON...');
+    console.log('Getting transaction JSON...');
+    const { hash } = await (window as any).mina.sendTransaction({
+      transaction: transactionJSON,
+      feePayer: {
+        fee: transactionFee,
+        memo: ''
+      },
+    });
+
+    const transactionLink = `https://devnet.minaexplorer.com/transaction/${hash}`;
+    console.log(`View transaction at ${transactionLink}`);
+
+    setTransactionLink(transactionLink);
+    setDisplayText(transactionLink);
+
+    setState({ ...state, creatingTransaction: false });
+    
+
+  }
   // -------------------------------------------------------
   // Refresh the current state
-
+/*
   const onRefreshCurrentCommitment = async () => {
     console.log('Getting zkApp state...');
     setDisplayText('Getting zkApp state...');
@@ -195,7 +253,7 @@ export default function Home() {
     console.log(`Current state in zkApp: ${currentCommitment.toString()}`);
     setDisplayText('');
   };
-
+*/
   // -------------------------------------------------------
   // Create UI elements
 
@@ -244,23 +302,51 @@ export default function Home() {
 
   let mainContent;
   if (state.hasBeenSetup && state.accountExists) {
+    if(state.free){
     mainContent = (
       <div style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <div className={styles.center} style={{ padding: 0 }}>
-          Current state in zkApp: {state.currentCommitment!.toString()}{' '}
-        </div>
-        <button
-          className={styles.card}
-          onClick={onSendTransaction}
-          disabled={state.creatingTransaction}
-        >
-          Send Transaction
-        </button>
-        <button className={styles.card} onClick={onRefreshCurrentCommitment}>
-          Get Latest State
-        </button>
+              <>
+          <Input
+            className="w-[300px] mt-8"
+            value={state.subdomain as string}
+            onChange={(e) => setState({...state, subdomain: e.target.value})}
+            placeholder="Subdomain"
+          />
+          <Input
+            className="w-[300px] "
+            value={state.ethereum as string}
+            onChange={(e) => setState({...state, ethereum: (e.target.value)})}
+            placeholder="Ethereum Address"
+          />
+          <Button onClick={onSendRegisterTransaction} className="mt-6">
+            Register
+          </Button>
+        </>
+  
       </div>
     );
+  }
+  else{
+    mainContent = (
+      <div style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <Input
+            className="w-[300px] mt-8"
+            value={state.subdomain as string}
+            onChange={(e) => setState({...state, subdomain: e.target.value})}
+            placeholder="Subdomain"
+          />
+
+        <button
+          className={styles.card}
+          onClick={onSendCheckTransaction}
+          disabled={state.creatingTransaction}
+        >
+          Check Subdomain
+        </button>
+  
+      </div>
+    );
+  }
   }
 
   return (

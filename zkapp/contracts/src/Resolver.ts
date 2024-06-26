@@ -2,89 +2,84 @@ import {
   Field,
   SmartContract,
   state,
-  State,
   method,
-  CircuitString,
   PublicKey,
   Struct,
-  DeployArgs,
+  Experimental
 } from 'o1js';
-import { SparseMerkleProof, ProvableSMTUtils } from 'o1js-merkle';
 
-class NameData extends Struct({
+import { PackedStringFactory } from "o1js-pack";
+
+
+export class String extends PackedStringFactory() {}
+
+
+export class DomainRecord extends Struct({
   eth_address: Field,
   mina_address: PublicKey,
-}) {}
+}) {
+  empty(): DomainRecord{
+    return new DomainRecord({
+      eth_address: Field(0),
+      mina_address: PublicKey.empty()
+    });
+  }
+}
 
-export { NameData };
+const { OffchainState } = Experimental;
+
+export const offchainState = OffchainState(
+  {
+    registry: OffchainState.Map(String, DomainRecord)
+  },
+  { logTotalCapacity: 10, maxActionsPerProof: 5 }
+);
+
+class StateProof extends offchainState.Proof {}
+
 
 export class Resolver extends SmartContract {
-  @state(Field) commitment = State<Field>();
+  @state(OffchainState.Commitments) offchainState = offchainState.commitments();
+
 
   init() {
     super.init();
-    this.commitment.set(
-      Field(
-        1363491840476538827947652000140631540976546729195695784589068790317102403216n
-      )
-    );
   }
 
-  @method register(
-    name: CircuitString,
-    namedata: NameData,
-    merkleProof: SparseMerkleProof
+  @method async register(
+    name: String,
+    namedata: DomainRecord
   ) {
-    let commitment = this.commitment.get();
-    this.commitment.requireEquals(commitment);
-    namedata.mina_address.assertEquals(this.sender);
+    //const sender = this.sender.getAndRequireSignature();
+    //namedata.mina_address.assertEquals(sender);
+    offchainState.fields.registry.update(name, {
+      from: undefined,
+      to: namedata,
+    });
 
-    ProvableSMTUtils.checkNonMembership(
-      merkleProof,
-      commitment,
-      name,
-      CircuitString
-    ).assertTrue();
-
-    let newCommitment = ProvableSMTUtils.computeRoot(
-      merkleProof.sideNodes,
-      name,
-      CircuitString,
-      namedata,
-      NameData
-    );
-
-    this.commitment.set(newCommitment);
   }
 
-  @method set_subdomain(
-    name: CircuitString,
-    oldNamedata: NameData,
-    newNamedata: NameData,
-    merkleProof: SparseMerkleProof
+  @method async set_subdomain(
+    name: String,
+    oldRecord: DomainRecord,
+    newRecord: DomainRecord,
   ) {
-    let commitment = this.commitment.get();
-    this.commitment.requireEquals(commitment);
+    //const sender = this.sender.getAndRequireSignature();
+    //oldRecord.mina_address.assertEquals(sender);
+    offchainState.fields.registry.update(name, {
+      from: oldRecord,
+      to: newRecord,
+    });
+  }
 
-    this.sender.assertEquals(oldNamedata.mina_address);
+  @method.returns(DomainRecord) 
+  async get_subdomain(name: String){
+    return (await offchainState.fields.registry.get(name)).value;
+  
+  }
 
-    ProvableSMTUtils.checkMembership(
-      merkleProof,
-      commitment,
-      name,
-      CircuitString,
-      oldNamedata,
-      NameData
-    ).assertTrue();
-
-    let newCommitment = ProvableSMTUtils.computeRoot(
-      merkleProof.sideNodes,
-      name,
-      CircuitString,
-      newNamedata,
-      NameData
-    );
-
-    this.commitment.set(newCommitment);
+  @method
+  async settle(proof: StateProof) {
+    await offchainState.settle(proof);
   }
 }

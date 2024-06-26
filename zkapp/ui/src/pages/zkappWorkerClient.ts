@@ -1,6 +1,4 @@
 import { fetchAccount, PublicKey, Field, CircuitString } from 'o1js';
-import { SparseMerkleProof } from 'o1js-merkle';
-import { NameData } from '../../../contracts/build/src/Resolver.js';
 
 
 import type {
@@ -12,14 +10,18 @@ import type {
 export default class ZkappWorkerClient {
   // ---------------------------------------------------------------------------------------
 
-  setActiveInstanceToBerkeley() {
-    return this._call('setActiveInstanceToBerkeley', {});
+  setActiveInstanceToDevnet() {
+    return this._call('setActiveInstanceToDevnet', {});
   }
 
   loadContract() {
     return this._call('loadContract', {});
   }
 
+  compileZkProgram() {
+    return this._call('compileZkProgram', {});
+  }
+  
   compileContract() {
     return this._call('compileContract', {});
   }
@@ -40,16 +42,28 @@ export default class ZkappWorkerClient {
       publicKey58: publicKey.toBase58(),
     });
   }
-
+/*
   async getCommitment(): Promise<Field> {
     const result = await this._call('getCommitment', {});
     return Field.fromJSON(JSON.parse(result as string));
   }
-  createRegisterTransaction() {
-    return this._call('createRegisterTransaction', {});
+*/
+  createRegisterTransaction(subdomain: string, mina_adress: string, eth_address: Field) {
+    return this._call('createRegisterTransaction', {
+      subdomain: subdomain, mina_adress: mina_adress, eth_address: eth_address
+    });
   }
   proveRegisterTransaction() {
     return this._call('proveRegisterTransaction', {});
+  }
+
+  createCheckTransaction(subdomain: string){
+    return this._call('createCheckTransaction', {
+      subdomain: subdomain
+    });
+  }
+  proveCheckTransaction() {
+    return this._call('proveCheckTransaction', {});
   }
   async getTransactionJSON() {
     const result = await this._call('getTransactionJSON', {});

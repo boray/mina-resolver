@@ -1,12 +1,12 @@
 {
   "version": 1,
   "deployAliases": {
-    "berkeley": {
+    "devnet": {
       "networkId": "testnet",
-      "url": "https://proxy.berkeley.minaexplorer.com/graphql",
-      "keyPath": "keys/berkeley.json",
-      "feepayerKeyPath": "/Users/boraysaygilier/.cache/zkapp-cli/keys/bosas.json",
-      "feepayerAlias": "bosas",
+      "url": "https://api.minascan.io/node/devnet/v1/graphql",
+      "keyPath": "keys/devnet.json",
+      "feepayerKeyPath": "/Users/boraysaygilier/.cache/zkapp-cli/keys/berkkey.json",
+      "feepayerAlias": "berkkey",
       "fee": "0.1",
       "smartContract": "Resolver"
     }
