@@ -5,6 +5,7 @@ import {
   Resolver,
   DomainRecord,
   offchainState,
+  String
 } from '../../zkapp/contracts/build/src/Resolver';
 import { PublicKey, Mina, PrivateKey, Field } from 'o1js';
 
@@ -44,42 +45,49 @@ export const database: Database = {
   },
 };
 
+// write checkpoint logic
+// and merkle lookup
 async function fetchOffchainName(name: string): Promise<NameData> {
-  const zkAppAddress = PublicKey.empty();
-  const sender_key = PrivateKey.random();
+  const zkAppAddress = PublicKey.fromBase58(process.env.ZKAPP_KEY!);
+  const sender_key = PrivateKey.fromBase58(process.env.MINA_KEY!);
   const sender = PublicKey.fromPrivateKey(sender_key);
-
+  const fee = 0.1;
   let resolver_contract = new Resolver(zkAppAddress);
   offchainState.setContractInstance(resolver_contract);
 
-  let res: Record;
+  
+  let res: DomainRecord;
+  let checkpoint;
   let ethereum_address = '0x0000000000000000000000000000000000000000';
   try {
-    const namehash = ethers.utils.namehash(name);
-    console.log(namehash);
-    let namefield = BigInt(namehash);
-
-    let tx = await Mina.transaction(sender, async () => {
-      res = await resolver_contract.get_subdomain(Field(namefield));
-    })
-      .sign([sender_key])
-      .prove()
-      .send();
+    try {
+      let tx = await Mina.transaction({ sender: sender, fee }, async () => {
+        res = await resolver_contract.get_subdomain(String.fromString(name));
+        checkpoint = resolver_contract.offchainState.getAndRequireEquals();
+      })
+      await tx.prove();
+      console.log('send transaction...');
+      const sentTx = await tx.sign([sender_key]).send();
+      sentTx.status
+      }
+    catch (err) {
+        console.log(err);
+      }
 
     ethereum_address = res!.eth_address.toBigInt().toString(16);
     console.log(ethereum_address);
     const scheme = {
       addresses: {
-        '60': '',
+        '60': ethereum_address,
         '0': '',
       },
     };
-    scheme.addresses[60] = ethereum_address;
-    //scheme.addresses[0] = fuel_address;
 
     return scheme as NameData;
   } catch (err) {
     console.error('Error fetching name from Mina', err);
     return {};
   }
+
+
 }

@@ -5,7 +5,7 @@ type Transaction = Awaited<ReturnType<typeof Mina.transaction>>;
 
 // ---------------------------------------------------------------------------------------
 
-import { DomainRecord, String, type offchainState, type Resolver } from '../../../contracts/build/src/Resolver.js';
+import type { DomainRecord, Resolver } from '../../../contracts/build/src/Resolver.js';
 
 
 const state = {
@@ -37,6 +37,7 @@ const functions = {
 
   },
   compileContract: async (args: {}) => {
+    await state.Resolver!.digest();
     await state.Resolver!.compile();
   },
   fetchAccount: async (args: { publicKey58: string }) => {
@@ -55,9 +56,10 @@ const functions = {
     return JSON.stringify(currentCommitment.toJSON());
   },
   */
-  createRegisterTransaction: async (args: {subdomain: string, mina_adress: string, eth_address: Field}) => {
+  createRegisterTransaction: async (args: {subdomain: string, mina_adress: string, eth_address: string}) => {
     // store these in state
-    let record = new DomainRecord({ eth_address: args.eth_address, mina_address: PublicKey.fromBase58(args.mina_adress)});
+    const {  DomainRecord, String } = await import('../../../contracts/build/src/Resolver.js');
+    let record = new DomainRecord({ eth_address: Field(args.eth_address), mina_address: PublicKey.fromBase58(args.mina_adress)});
     const transaction = await Mina.transaction(async () => {
       state.zkapp!.register(String.fromString(args.subdomain), record);
     });
@@ -70,6 +72,7 @@ const functions = {
 
   createCheckTransaction: async (args: {subdomain: string}) => {
     // store these in state
+    const { String } = await import('../../../contracts/build/src/Resolver.js');
     let res;
     const transaction = await Mina.transaction(async () => {
       res = await state.zkapp!.get_subdomain(String.fromString(args.subdomain));

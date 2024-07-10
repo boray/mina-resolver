@@ -1,5 +1,4 @@
-import { fetchAccount, PublicKey, Field, CircuitString } from 'o1js';
-
+import { fetchAccount, PublicKey, Field } from 'o1js';
 
 import type {
   ZkappWorkerRequest,
@@ -48,7 +47,7 @@ export default class ZkappWorkerClient {
     return Field.fromJSON(JSON.parse(result as string));
   }
 */
-  createRegisterTransaction(subdomain: string, mina_adress: string, eth_address: Field) {
+  createRegisterTransaction(subdomain: string, mina_adress: string, eth_address: string) {
     return this._call('createRegisterTransaction', {
       subdomain: subdomain, mina_adress: mina_adress, eth_address: eth_address
     });

@@ -162,7 +162,7 @@ export default function Home() {
     
     const subdomain = state.subdomain;
     const normalized = subdomain.slice(-9) == '.kimchi.eth' && subdomain.length > 9;
-    const ethereum_field = Field(BigInt(state.ethereum));
+    const ethereum_field = BigInt(state.ethereum).toString();
     await state.zkappWorkerClient!.createRegisterTransaction(subdomain,state.publicKey!.toBase58() ,ethereum_field);
 
     setDisplayText('Creating proof...');
