@@ -21,6 +21,7 @@ offchainState.setContractInstance(resolver_contract);
 if (Local.proofsEnabled) {
   console.time('compile program');
   await offchainState.compile();
+  offchainState.setContractClass(Resolver);
   console.timeEnd('compile program');
   console.time('compile contract');
   await Resolver.compile();

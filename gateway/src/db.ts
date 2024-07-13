@@ -1,13 +1,12 @@
 import { Database } from './server';
 import { EMPTY_CONTENT_HASH, ETH_COIN_TYPE, ZERO_ADDRESS } from './constants';
-import { ethers } from 'ethers';
 import {
   Resolver,
   DomainRecord,
   offchainState,
   String
 } from '../../zkapp/contracts/build/src/Resolver';
-import { PublicKey, Mina, PrivateKey, Field } from 'o1js';
+import { PublicKey, Mina, PrivateKey } from 'o1js';
 
 interface NameData {
   addresses?: { [coinType: number]: string };
@@ -59,6 +58,7 @@ async function fetchOffchainName(name: string): Promise<NameData> {
   let res: DomainRecord;
   let checkpoint;
   let ethereum_address = '0x0000000000000000000000000000000000000000';
+
   try {
     try {
       let tx = await Mina.transaction({ sender: sender, fee }, async () => {

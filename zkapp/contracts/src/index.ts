@@ -1,3 +1,3 @@
-import { Resolver } from './Resolver.js';
+import { Resolver, DomainRecord, String, offchainState} from './Resolver.js';
 
-export { Resolver };
+export { Resolver, DomainRecord, String, offchainState };

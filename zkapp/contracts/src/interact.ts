@@ -30,7 +30,6 @@ type Config = {
 };
 let configJson: Config = JSON.parse(await fs.readFile('config.json', 'utf8'));
 let config = configJson.deployAliases[deployAlias];
-console.log(config)
 let feepayerKeysBase58: { privateKey: string; publicKey: string } = JSON.parse(
   await fs.readFile(config.feepayerKeyPath, 'utf8')
 );
@@ -67,7 +66,10 @@ console.time('compile contract');
 await Resolver.compile();
 console.timeEnd('compile contract');
 
+//let checkpoint = resolver_contract.offchainState.getAndRequireEquals();
+//console.log(checkpoint);
 
+/*
 
 console.time('deploy');
 try {
@@ -92,7 +94,7 @@ catch (err) {
 }
 console.timeEnd('deploy');
 
-
+*/
 console.time('register first name');
 try {
 tx = await Mina.transaction({ sender: feepayerAddress, fee }, async () => {
@@ -118,20 +120,7 @@ catch (err){
 console.timeEnd('register first name');
 
 
-/*
-console.time('register second name');
-tx = await Mina.transaction({ sender: feepayerAddress, fee }, async () => {
-  let new_record = new DomainRecord({ eth_address: Field(12312), mina_address: account_two });
-  await resolver_contract.register(String.fromString("test.kimchi.eth"),new_record );
 
-})
-  .sign([account_two.key])
-  .prove()
-  .send();
-console.log(tx.toPretty());
-console.timeEnd('register second name');
-
-*/
 
 console.time('settlement proof 1');
 let proof = await offchainState.createSettlementProof();

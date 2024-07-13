@@ -1,0 +1,19 @@
+{
+  "name": "settler",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsc src/index.ts && node dist/index.js",
+    "build": "tsc"
+  },
+  "author": "boray",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.3"
+  },
+  "dependencies": {
+    "o1js": "^1.5.0"
+  }
+}

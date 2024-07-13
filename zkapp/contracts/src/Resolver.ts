@@ -35,7 +35,7 @@ export const offchainState = OffchainState(
   { logTotalCapacity: 10, maxActionsPerProof: 5 }
 );
 
-class StateProof extends offchainState.Proof {}
+export class StateProof extends offchainState.Proof {}
 
 
 export class Resolver extends SmartContract {
